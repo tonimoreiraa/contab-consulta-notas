@@ -15,5 +15,8 @@
     "puppeteer": "^24.8.2",
     "ts-node": "^10.9.2",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }
