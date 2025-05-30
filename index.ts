@@ -2,20 +2,39 @@ import puppeteer from "puppeteer";
 import xlsx from 'xlsx'
 import fs from 'fs'
 import path from "path";
+import pino from 'pino'
+
+// Ensure output directory exists
+if (!fs.existsSync('output')) {
+    fs.mkdirSync('output');
+    fs.mkdirSync('output/prints');
+}
+
+const logger = pino({
+    transport: {
+        targets: [
+            {
+                target: 'pino-pretty',
+                options: { colorize: true },
+                level: 'info',
+            },
+            {
+                target: 'pino/file',
+                options: { destination: 'output/app.log' },
+                level: 'trace',
+            },
+        ],
+    },
+});
 
 declare var document: any
 
 async function main()
 {
-    if (!fs.existsSync('output')) {
-        fs.mkdirSync('output');
-        fs.mkdirSync('output/prints');
-    }
-
     const reports = fs.readdirSync('relatorios').filter(file => file.endsWith('.xlsx'));
 
     for (const report of reports) {
-        console.log('Relatório: ', report)
+        logger.info({ report }, 'Relatório processando');
         const workbook = xlsx.readFile(`relatorios/${report}`);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
@@ -43,7 +62,7 @@ async function main()
         })
         for (const nota of notas) {
             try {
-                console.log('Nota: ', nota.trim())
+                logger.info({ nota }, 'Processando nota');
                 const input = await page.waitForSelector('#field_chaveNota')
                 await input?.type(nota);
                 const button = await page.waitForSelector('body > jhi-main > div.container-fluid > div > jhi-consultar-valor-imposto-nfe > div > form > div > div.input-group.mb-3 > div.input-group-append > button')
@@ -84,7 +103,7 @@ async function main()
                 await page.screenshot({ path: `./output/prints/${nota}.png`, fullPage: true })
                 await page.reload()
             } catch (error) {
-                console.error(`Erro ao processar nota ${nota} no relatório ${report}:`, error);
+                logger.error({ err: error, nota, report }, `Erro ao processar nota ${nota} no relatório ${report}`);
                 continue;
             }
         }
