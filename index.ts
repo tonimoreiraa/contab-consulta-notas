@@ -42,46 +42,51 @@ async function main()
             waitUntil: 'networkidle0'
         })
         for (const nota of notas) {
-            console.log('Nota: ', nota.trim())
-            const input = await page.waitForSelector('#field_chaveNota')
-            await input?.type(nota);
-            const button = await page.waitForSelector('body > jhi-main > div.container-fluid > div > jhi-consultar-valor-imposto-nfe > div > form > div > div.input-group.mb-3 > div.input-group-append > button')
-            await button?.click()
-            await page.waitForNetworkIdle()
+            try {
+                console.log('Nota: ', nota.trim())
+                const input = await page.waitForSelector('#field_chaveNota')
+                await input?.type(nota);
+                const button = await page.waitForSelector('body > jhi-main > div.container-fluid > div > jhi-consultar-valor-imposto-nfe > div > form > div > div.input-group.mb-3 > div.input-group-append > button')
+                await button?.click()
+                await page.waitForNetworkIdle()
 
-            // Extrai planilha
-            // @ts-nocheck
-            const result = await page.evaluate(() => {
-                const table = document.querySelector('body > jhi-main > div.container-fluid > div > jhi-consultar-valor-imposto-nfe > div > div.table-responsive > div > table');
-                if (!table) return [];
+                // Extrai planilha
+                // @ts-nocheck
+                const result = await page.evaluate(() => {
+                    const table = document.querySelector('body > jhi-main > div.container-fluid > div > jhi-consultar-valor-imposto-nfe > div > div.table-responsive > div > table');
+                    if (!table) return [];
 
-                const headers = Array.from(table.querySelectorAll('thead th')).map((th: any) => th.innerText.trim());
-                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const headers = Array.from(table.querySelectorAll('thead th')).map((th: any) => th.innerText.trim());
+                    const rows = Array.from(table.querySelectorAll('tbody tr'));
 
-                return rows.map((row: any) => {
-                    const cells = Array.from(row.querySelectorAll('td')) as any;
-                    return headers.reduce((obj, header, index) => {
-                        obj[header] = cells[index]?.innerText.trim() || '';
-                        return obj;
-                    }, {});
+                    return rows.map((row: any) => {
+                        const cells = Array.from(row.querySelectorAll('td')) as any;
+                        return headers.reduce((obj, header, index) => {
+                            obj[header] = cells[index]?.innerText.trim() || '';
+                            return obj;
+                        }, {});
+                    });
                 });
-            });
 
-            table.push(...result.map(i => ({
-                'Nota': nota,
-                ...i,
-            })))
+                table.push(...result.map(i => ({
+                    'Nota': nota,
+                    ...i,
+                })))
 
-            if (table.length > 0) {
-                const ws = xlsx.utils.json_to_sheet(table);
-                const wb = xlsx.utils.book_new();
-                xlsx.utils.book_append_sheet(wb, ws, "Notas");
-                const reportName = path.basename(report);
-                xlsx.writeFile(wb, `output/${reportName}.xlsx`);
+                if (table.length > 0) {
+                    const ws = xlsx.utils.json_to_sheet(table);
+                    const wb = xlsx.utils.book_new();
+                    xlsx.utils.book_append_sheet(wb, ws, "Notas");
+                    const reportName = path.basename(report);
+                    xlsx.writeFile(wb, `output/${reportName}.xlsx`);
+                }
+
+                await page.screenshot({ path: `./output/prints/${nota}.png`, fullPage: true })
+                await page.reload()
+            } catch (error) {
+                console.error(`Erro ao processar nota ${nota} no relatório ${report}:`, error);
+                continue;
             }
-
-            await page.reload()
-            await page.screenshot({ path: `./output/prints/${nota}.png`, fullPage: true })
         }
     }
 
